@@ -1,0 +1,8 @@
+#include <vector>
+#include <fstream>
+#include <cassert>
+#include <cctype>
+
+using namespace std;
+
+void parse_matrix(char* filepath, vector<vector<pair<int, int>>>& adj);
