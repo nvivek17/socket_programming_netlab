@@ -26,7 +26,7 @@ string conv_to_bin(string s){
 
 int main(int argc , char* argv[]){
 
-    assert(argc == 3);
+    assert(argc == 4);
 
 
     int sockfd, numbytes;
@@ -45,10 +45,13 @@ int main(int argc , char* argv[]){
         perror("socket");
         exit(1);
     }
+    char hostname[100];
+    gethostname(hostname,(size_t)(100));
+    printf("text: %s",hostname);
     their_addr.sin_family = AF_INET; 
     their_addr.sin_port = htons(PORT); 
     // their_addr.sin_addr = *((struct in_addr *)he->h_addr);
-    inet_pton(AF_INET, "127.0.0.1", &their_addr.sin_addr);
+    inet_pton(AF_INET,argv[1] , &their_addr.sin_addr);
 
     bzero(&(their_addr.sin_zero), 8); 
     socklen_t sock_len=sizeof(struct sockaddr);
@@ -56,8 +59,8 @@ int main(int argc , char* argv[]){
     perror("connect");
     exit(1);
     }
-
-    string bin_msg = conv_to_bin(std::string(argv[1]) + "," + std::string(argv[2]));
+    
+    string bin_msg = conv_to_bin(std::string(argv[3])+ "," + std::string(argv[2]));
     send(sockfd, bin_msg.data(), sizeof(bin_msg.data()),0);
 
     numbytes=recv(sockfd, buffer, MAXDATASIZE-1, 0);

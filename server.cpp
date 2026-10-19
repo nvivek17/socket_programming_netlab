@@ -86,6 +86,7 @@ int main(int argc, char * argv[]){
         perror("cant find out server name");
         exit(1);
     }
+    system("hostname -I");
     std::cout<<"Server name is:"<<hostname<<std::endl;
     string links[ctr];
     std::vector<vector<pair<int,int>>> adj;
@@ -102,13 +103,14 @@ int main(int argc, char * argv[]){
         printf("Server got connection from %s\n" , inet_ntoa(their_addr.sin_addr));
             if(!fork()){
                 close(socketfd);
-                int numbytes=recv(socketfd, buffer, MAXDATASIZE-1, 0);
+                int numbytes=recv(other_fd[i], buffer, MAXDATASIZE-1, 0);
                 if ( numbytes== -1) {
-                    perror("recv");
+                    perror("recv, blah blah");
                     exit(1);
                 }
                 buffer[numbytes] = '\0';
                 links[i]=buffer;
+                printf("Text: %s\n",buffer);
                 memset(buffer,0,sizeof(buffer));
                 // if(send(other_fd,msg.data(),sizeof(msg),0)==-1){ perror("Error while sending msg from server");}
                 close(other_fd[i]);exit(0);
