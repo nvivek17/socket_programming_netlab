@@ -3,7 +3,6 @@ import java.util.ArrayList;
 
 import java.util.Scanner;
 import java.io.IOException;
-import java.lang.reflect.Array;
 import java.io.File;
 import java.net.Socket;
 
@@ -40,6 +39,16 @@ class oracle_node {
             e.printStackTrace();
             System.err.println("error in starting server socket, exiting");
             System.exit(1);
+        }
+
+        try {
+            ProcessBuilder pb = new ProcessBuilder("hostname", "-I");
+            pb.inheritIO();
+            Process process = pb.start();
+            process.waitFor();
+            
+        } catch (Exception e) {
+            System.out.println("Could not run hostname command.");
         }
 
         this.virtual_nodes = new ArrayList<VirtualNode>();
@@ -132,25 +141,24 @@ class oracle_node {
                 stripped_line = line.strip();
                 if(stripped_line.isBlank() || stripped_line.startsWith("#")) continue;
                 
-                String[] digits_hopefully = stripped_line.split("\\s+");
+               String[] digits_hopefully = stripped_line.split("\\s+");
                 ArrayList<Integer> matrix_row = new ArrayList<Integer>();
+                
+                boolean valid_row = true;
                 for(String s: digits_hopefully){
-                    if(!s.matches("\\d+")){
-                        // invalid line, non empty, does not start with "#", does not start with a digit
-                        System.out.println("\n invalid line found: " + line);
-                        System.out.println("graph remains unchanged");
-                        
-                        // do not update adj
-                        if(scanner != null) scanner.close();
-                        return false;
+                    if(!s.matches("-?\\d+")){
+                        valid_row = false;
+                        break;
                     }
                     
-                    // ok a number is found
                     matrix_row.add(Integer.valueOf(s));
                 }
                 
-                // line was only numbers, good
-                // update the class fields
+                if(!valid_row){
+                    continue; 
+                }
+                
+                // line was only numbers
                 if(row_num == 0){
                     new_n = matrix_row.size()+1;
                     assert(adj != null);
@@ -167,8 +175,10 @@ class oracle_node {
                 int col_num = row_num+1;
                 assert(matrix_row.size() == new_n-row_num-1);
                 for(Integer d: matrix_row){
-                    new_adj.get(row_num).add(new Edge(virtual_nodes.get(col_num), d));
-                    if(col_num != row_num) new_adj.get(col_num).add(new Edge(virtual_nodes.get(row_num), d));
+                    if(d != -1){
+                        new_adj.get(row_num).add(new Edge(virtual_nodes.get(col_num), d));
+                        if(col_num != row_num) new_adj.get(col_num).add(new Edge(virtual_nodes.get(row_num), d));
+                    }
                     col_num++;
                 }
 
@@ -299,7 +309,7 @@ class oracle_node {
 
         public void send_link_state(){
             
-            int num_links = adj.get(id).size();
+            int num_links = adj.get(id).size() + 1;
             
             int tuple_size = 11; // 1+4+2+4
             byte[] tuple = new byte[tuple_size];
@@ -307,12 +317,33 @@ class oracle_node {
             int LSP_offset = 4;
             byte[] LSP = new byte[4 + tuple_size*num_links];
 
-            LSP[0] = (byte)(num_links       & 0xFF);
-            LSP[1] = (byte)(num_links >>  8 & 0xFF);
-            LSP[2] = (byte)(num_links >> 16 & 0xFF);
-            LSP[3] = (byte)(num_links >> 24 & 0xFF);
+            LSP[0] = (byte)(num_links >> 24 & 0xFF);
+            LSP[1] = (byte)(num_links >> 16 & 0xFF);
+            LSP[2] = (byte)(num_links >>  8 & 0xFF);
+            LSP[3] = (byte)(num_links       & 0xFF);
 
             System.out.println("\nsending link state for: " + name);
+
+            tuple[0] = ((byte)this.name);
+            
+            assert(this.ip != null);
+            tuple[1] = this.ip[0];
+            tuple[2] = this.ip[1];
+            tuple[3] = this.ip[2];
+            tuple[4] = this.ip[3];
+            
+            assert(this.port != null);
+            tuple[5] = this.port[0];
+            tuple[6] = this.port[1];
+
+            int self_cost = 0;
+            tuple[7] = (byte)(self_cost >> 24 & 0xFF);
+            tuple[8] = (byte)(self_cost >> 16 & 0xFF);
+            tuple[9] = (byte)(self_cost >>  8 & 0xFF);
+            tuple[10] = (byte)(self_cost       & 0xFF);
+            
+            System.arraycopy(tuple, 0, LSP, LSP_offset, tuple_size);
+            LSP_offset += tuple_size;
 
             for(Edge e: adj.get(id)){
                 // name + ip + port + cost(int)
@@ -360,8 +391,12 @@ class oracle_node {
 public class oracle {
 
     public static void main(String[] args){
+        if(args.length != 1){
+            System.out.println("usage: java oracle <config.txt>");
+            System.exit(1);
+        }
         
-        oracle_node on = new oracle_node("config.txt", 5000);
+        oracle_node on = new oracle_node(args[0], 5000);
 
         try {
         // read config file once
