@@ -16,7 +16,7 @@
 #include <ctime>
 
 // in seconds
-#define AGE_LIMIT 60*25
+#define AGE_LIMIT 25
 #define MAXDATASIZE 1000
 #define PORT 5000
 using namespace std;
@@ -83,21 +83,28 @@ void print_graph(){
             }
         }
     }
-    for(int i=0;i<max_node;i++){
-        for(int j=0;j<i+1;j++){cout<<" _ ";}
-        for(int j=i+1;j<=max_node;j++){
-            if(time(0) - edge_time[i][j] < AGE_LIMIT)
-               if(graph[i][j] >= 0)
-                 cout << " " << graph[i][j] << " ";
-                else 
-                 cout << -1 << " ";
-
-            else
-                cout << -1 << " ";
+    for(int i=0;i<=max_node;i++){
+        
+        for(int j=0;j<i;j++){
+            cout<<" _ ";
         }
 
+        for(int j=i+1;j<=max_node;j++){
+            if(time(0) - edge_time[i][j] < AGE_LIMIT){
+                if(graph[i][j] >= 0)
+                    cout << " " << graph[i][j] << " ";
+                else 
+                    cout << -1 << " ";
+            }
+            else{
+                cout << -1 << " ";
+            }            
+        }
+        
+        cout << '\n';
     }
-    cout<<"\n\n";
+    
+    if(max_node != -1) cout<<"\n\n";
 }
 void send_my_lsp(int udp_fd){
     if(node_name==0) return;
@@ -133,7 +140,10 @@ void send_my_lsp(int udp_fd){
 
 int main(int argc , char* argv[]){
 
-    assert(argc == 4);
+    if(argc != 4){
+        cout << "usage: <server ip> <vn port> <vn ip>\n";
+        exit(0);
+    }
 
     init_graph();
     int sockfd, numbytes;
@@ -217,6 +227,12 @@ int main(int argc , char* argv[]){
             }
             string s=string(1,node_name)+"=0";
 
+            for(int i=0; i<26; i++){
+                curr_neighbours[i].cost=-1;
+                graph[i][node_name - 'A'] = -1;
+                graph[node_name - 'A'][i] = -1;
+            }
+
             for(int i=0;i<num_tuples;i++){
                 LSTuple t = tuples[i];
                 int cost=ntohl(t.cost);
@@ -246,6 +262,11 @@ int main(int argc , char* argv[]){
                 if(lsp_msg.seq_no > latest_seq_no[origin_id]){
                     latest_seq_no[origin_id]=lsp_msg.seq_no;
 
+                    for(int i=0; i<26; i++){
+                        graph[i][origin_id] = -1;
+                        graph[origin_id][i] = -1;
+                    }
+                    
                     for(int i=0;i< lsp_msg.num_neigh;i++){
                         int neigh_id=lsp_msg.neighbours[i].node-'A';
                         int cost=lsp_msg.neighbours[i].cost;
@@ -255,6 +276,7 @@ int main(int argc , char* argv[]){
                         edge_time[origin_id][neigh_id]=time(0);
                         edge_time[neigh_id][origin_id]=time(0);
                     }
+
                     for(int i=0;i<26;i++){
                         if(curr_neighbours[i].cost > 0){
                             if(curr_neighbours[i].ip == sender_addr.sin_addr.s_addr && curr_neighbours[i].port==ntohs(sender_addr.sin_port)){
